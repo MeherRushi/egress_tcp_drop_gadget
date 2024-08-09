@@ -56,6 +56,10 @@ sudo -E irun ghcr.io/inspektor-gadget/gadget/tcp_pkt_dropper:latest --public-key
 - This will filter and drop the TCP packets with destination address, port pair `110.77.142:443`
 
 
+## Screenshot
+
+![refrence_image](public/demo.png)
+
 ## Requirements
 
 - ig v0.26.0 (CHANGEME)
