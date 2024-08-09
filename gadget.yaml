@@ -1,0 +1,59 @@
+name: egress_tcp_drop
+description: Drop egress TCP packets based on destination address, port pair
+homepageURL: http://egress_tcp_drop.com
+documentationURL: https://egress_tcp_drop.com/docs
+sourceURL: https://github.com/my-org/egress_tcp_drop/
+datasources:
+  tracedropcnt:
+    fields:
+      drop_cnt:
+        annotations:
+          description: Number of packets dropped for that given (IP,port) pair
+      dst:
+        annotations:
+          description: Destination Address of the Packet
+      family:
+        annotations:
+          description: The IP packet Version
+      filter_ipv4:
+        annotations:
+          description: The Destination IP address to be filtered
+      mntns_id:
+        annotations:
+          description: Mount Namespace Id
+      src:
+        annotations:
+          description: Source Address of the Packet
+      timestamp_raw:
+        annotations:
+          description: The Time Stamp of the Packet at egress
+ebpfParams:
+  a:
+    key: a
+    defaultValue: "0"
+    description: The first 8 bits of the filter IPv4 address in Integer Format (Eg:-
+      127)
+  b:
+    key: b
+    defaultValue: "0"
+    description: The second 8 bits of the filter IPv4 address in Integer Format (Eg:-
+      0)
+  c:
+    key: c
+    defaultValue: "0"
+    description: The third 8 bits of the filter IPv4 address in Integer Format (Eg:-
+      0)
+  d:
+    key: d
+    defaultValue: "0"
+    description: The last 8 bits of the filter IPv4 address in Integer Format (Eg:-
+      1)
+  p:
+    key: p
+    defaultValue: "0"
+    description: port number (Eg:- 443)
+gadgetParams:
+  iface:
+    key: iface
+    defaultValue: ""
+    description: Network interface to attach to
