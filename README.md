@@ -1,6 +1,6 @@
 # egress tcp drop
 
-Drop egress TCP packets based on destination address and port pair
+Drop egress TCP packets based on <desitnation IP, port number> pair
 
 ## How to use
 
@@ -20,6 +20,29 @@ $ sudo -E ig image build -t tcp_pkt_dropper .
 ```bash
 $ sudo -E ig run ghcr.io/inspektor-gadget/gadget/tcp_pkt_dropper:latest --public-keys=""
 ```
+
+## Working
+
+This program drops all the TCP packets at the tc hookpoint, given the IPv4 address. If not mentioned, all the packets will be dropped.
+
+We also track the number of the packets dropped per <desitnation IP, port number> pair
+
+## Approach
+
+I actually faced a little bit of an issue trying to take the IP address as a string/array or in the natural format (such as 127.0.0.1 or 2001:db8:: ), but I kept on running into marshalling errors of the parameters.
+
+So temporarily I thought of taking IPv4 address and port using flags --a,--b,--c,--d,--p as described in the [flag section](#flags).
+
+## Future Work
+
+- improve the input flags format
+
+- extend the input to IPv6 as well
+
+- Can definetly decouple the IP address and Port Number while comparision.
+
+- Can look into the filtering based on container mount id as well
+
 
 ## Flags
 
