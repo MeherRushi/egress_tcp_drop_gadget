@@ -4,56 +4,83 @@ homepageURL: http://egress_tcp_drop.com
 documentationURL: https://egress_tcp_drop.com/docs
 sourceURL: https://github.com/my-org/egress_tcp_drop/
 datasources:
-  tracedropcnt:
+  events_map:
+    annotations:
+      events_map.collect: "true"
+    fields: {}
+  events_map_iter:
     fields:
+      comm:
+        annotations:
+          description: 'TODO: Fill field description'
       drop_cnt:
         annotations:
-          description: Number of packets dropped for that given (IP,port) pair
+          description: 'TODO: Fill field description'
       dst:
         annotations:
-          description: Destination Address of the Packet
+          description: 'TODO: Fill field description'
+      dst_endpoint:
+        annotations:
+          description: 'TODO: Fill field description'
       family:
         annotations:
-          description: The IP packet Version
+          description: 'TODO: Fill field description'
       filter_ipv4:
         annotations:
-          description: The Destination IP address to be filtered
+          description: 'TODO: Fill field description'
+      gid:
+        annotations:
+          description: 'TODO: Fill field description'
       mntns_id:
         annotations:
-          description: Mount Namespace Id
+          description: 'TODO: Fill field description'
+      netns_id:
+        annotations:
+          description: 'TODO: Fill field description'
+      pcomm:
+        annotations:
+          description: 'TODO: Fill field description'
+      pid:
+        annotations:
+          description: 'TODO: Fill field description'
+      ppid:
+        annotations:
+          description: 'TODO: Fill field description'
       src:
         annotations:
-          description: Source Address of the Packet
+          description: 'TODO: Fill field description'
+      tid:
+        annotations:
+          description: 'TODO: Fill field description'
       timestamp_raw:
         annotations:
-          description: The Time Stamp of the Packet at egress
-ebpfParams:
-  a:
-    key: a
-    defaultValue: "0"
-    description: The first 8 bits of the filter IPv4 address in Integer Format (Eg:-
-      127)
-  b:
-    key: b
-    defaultValue: "0"
-    description: The second 8 bits of the filter IPv4 address in Integer Format (Eg:-
-      0)
-  c:
-    key: c
-    defaultValue: "0"
-    description: The third 8 bits of the filter IPv4 address in Integer Format (Eg:-
-      0)
-  d:
-    key: d
-    defaultValue: "0"
-    description: The last 8 bits of the filter IPv4 address in Integer Format (Eg:-
-      1)
-  p:
-    key: p
-    defaultValue: "0"
-    description: port number (Eg:- 443)
-gadgetParams:
-  iface:
-    key: iface
-    defaultValue: ""
-    description: Network interface to attach to
+          description: 'TODO: Fill field description'
+      uid:
+        annotations:
+          description: 'TODO: Fill field description'
+params:
+  ebpf:
+    a:
+      key: a
+      defaultValue: 0
+      description: 'TODO: Fill parameter description'
+    b:
+      key: b
+      defaultValue: 0
+      description: 'TODO: Fill parameter description'
+    c:
+      key: c
+      defaultValue: 0
+      description: 'TODO: Fill parameter description'
+    d:
+      key: d
+      defaultValue: 0
+      description: 'TODO: Fill parameter description'
+    loss_percentage:
+      key: loss_percentage
+      defaultValue: 100
+      description: 'TODO: Fill parameter description'
+    port:
+      key: port
+      defaultValue: 0
+      description: 'TODO: Fill parameter description'
