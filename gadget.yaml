@@ -19,12 +19,6 @@ datasources:
       dst:
         annotations:
           description: 'TODO: Fill field description'
-      dst_endpoint:
-        annotations:
-          description: 'TODO: Fill field description'
-      family:
-        annotations:
-          description: 'TODO: Fill field description'
       filter_ipv4:
         annotations:
           description: 'TODO: Fill field description'
@@ -60,27 +54,7 @@ datasources:
           description: 'TODO: Fill field description'
 params:
   ebpf:
-    a:
-      key: a
-      defaultValue: 0
-      description: 'TODO: Fill parameter description'
-    b:
-      key: b
-      defaultValue: 0
-      description: 'TODO: Fill parameter description'
-    c:
-      key: c
-      defaultValue: 0
-      description: 'TODO: Fill parameter description'
-    d:
-      key: d
-      defaultValue: 0
-      description: 'TODO: Fill parameter description'
     loss_percentage:
       key: loss_percentage
-      defaultValue: 100
-      description: 'TODO: Fill parameter description'
-    port:
-      key: port
-      defaultValue: 0
-      description: 'TODO: Fill parameter description'
+      defaultValue: "100"
+      description: The percentage of the total number of packets to be dropped
