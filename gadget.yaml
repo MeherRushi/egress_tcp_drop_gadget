@@ -70,6 +70,22 @@ params:
       key: d
       defaultValue: ""
       description: 'TODO: Fill parameter description'
+    egress:
+      key: egress
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    filter_tcp:
+      key: filter_tcp
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    filter_udp:
+      key: filter_udp
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    ingress:
+      key: ingress
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
     loss_percentage:
       key: loss_percentage
       defaultValue: ""
