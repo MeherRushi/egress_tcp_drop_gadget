@@ -11,10 +11,11 @@ To do :
 
 # user space
 - Change the IP parameter for ipv4 and ipv6 - need to read code
-- then use kubeIPresolver to filter by name etc - need to read code
+- then use kubeIPresolver to filter by name etc 
+	- looks like for the non image based gadgets
 
 # Current Issues:
-- Gadget Parameter issue
+- Gadget Parameter issue - resolved
  */
 
 
