@@ -54,7 +54,27 @@ datasources:
           description: 'TODO: Fill field description'
 params:
   ebpf:
+    a:
+      key: a
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    b:
+      key: b
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    c:
+      key: c
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    d:
+      key: d
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
     loss_percentage:
       key: loss_percentage
-      defaultValue: "100"
-      description: The percentage of the total number of packets to be dropped
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'
+    port:
+      key: port
+      defaultValue: ""
+      description: 'TODO: Fill parameter description'

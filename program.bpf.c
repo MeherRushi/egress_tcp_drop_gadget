@@ -82,21 +82,23 @@ struct {
 
 GADGET_MAPITER(events_map_iter,events_map);
 
+
+// we use the following variables as parameters
 const volatile __u8 a = 0;
 const volatile __u8 b = 0;
 const volatile __u8 c = 0;
 const volatile __u8 d = 0;
 const volatile __u16 port = 0;
-const volatile __u32 loss_percentage = 100;
-const volatile bool filter_tcp = true;
-const volatile bool filter_udp = true;
+const volatile __u32 loss_percentage = 50;
+const volatile bool filter_tcp = true;		/* This is a boolean flag to enable filtering of TCP packets */
+const volatile bool filter_udp = true;		/* This is a boolean flag to enable filtering of UDP packets */
 
-// GADGET_PARAM(a);
-// GADGET_PARAM(b);
-// GADGET_PARAM(c);
-// GADGET_PARAM(d);
-// GADGET_PARAM(port);
-// GADGET_PARAM(loss_percentage);
+GADGET_PARAM(a);
+GADGET_PARAM(b);
+GADGET_PARAM(c);
+GADGET_PARAM(d);
+GADGET_PARAM(port);
+GADGET_PARAM(loss_percentage);
 
 struct event {
 	gadget_timestamp timestamp_raw;
@@ -124,8 +126,12 @@ struct event {
 /* 
 Let's take the ip to be in the 
 format of -a 127 -b 0 -c 0 -d 1 -port 443
-which translates to 127.0.0.1:443 */
+which translates to 127.0.0.1:443 
+*/
 
+
+/* This function drops packets based on independent (Bernoulli) probability model 
+where each packet is dropped with an independent probabilty for dropping packets */
 static int drop_packet(__u32 rand_num, __u64 threshold, struct event *event_map_val,
 								   struct event *event, struct events_map_key *key)
 {
@@ -145,7 +151,7 @@ static int drop_packet(__u32 rand_num, __u64 threshold, struct event *event_map_
 	return TC_OK;
 }
 
-static __always_inline void read_ipv6_address(struct event* event, struct events_map_key *key, 	struct ipv6hdr *ip6h ){
+static __always_inline void read_ipv6_address(struct event *event, struct events_map_key *key, struct ipv6hdr *ip6h ){
 	bpf_probe_read_kernel(event->src.addr_raw.v6, sizeof(event->src.addr_raw.v6), ip6h->saddr.in6_u.u6_addr8);
 	bpf_probe_read_kernel(key->dst.addr_raw.v6, sizeof(key->dst.addr_raw.v6), ip6h->daddr.in6_u.u6_addr8);
 }
@@ -153,21 +159,21 @@ static __always_inline void read_ipv6_address(struct event* event, struct events
 SEC("classifier/egress/drop")
 int egress_tcp_drop(struct __sk_buff *skb){
 		
-	struct events_map_key *key;
-	struct sockets_key sockets_key_for_md; 
+	struct events_map_key key;						/* This is the key for events_map -> being the dst addr,port pair */
+	struct sockets_key sockets_key_for_md; 			/* This is for socket enrichement map */
 
-	struct gadget_l4endpoint_t filter_ip;
+	struct gadget_l4endpoint_t filter_ip;			/* filter ip - ideally should be a parameter from userspace */
 
-	struct event *event;
-	struct event *event_map_val ;
+	struct event event;								/* The sturct to store the information regarding the event */
+	struct event *event_map_val ;					/* The evetnts which are stored in the events_map */
 
 	if(!skb) 
-		return TC_SHOT;
+		return TC_SHOT;							
 
-	event->netns_id = skb->cb[0]; // cb[0] initialized by dispatcher.bpf.c
-	sockets_key_for_md.netns = event->netns_id;
+	event.netns_id = skb->cb[0]; 					// cb[0] initialized by dispatcher.bpf.c to get the netns
+	sockets_key_for_md.netns = event.netns_id;		
 
-    void *data = (void *)(long)skb->data;
+    void *data = (void *)(long)skb->data;			
     void *data_end = (void *)(long)skb->data_end;
 
     struct ethhdr *eth = data;
@@ -202,9 +208,9 @@ int egress_tcp_drop(struct __sk_buff *skb){
 			return TC_OK;
 		}
 
-		event->src.addr_raw.v4 = bpf_ntohl(ip4h->saddr);
-		key->dst.addr_raw.v4 = bpf_ntohl(ip4h->daddr);
-		event->src.version = key->dst.version = 4;
+		event.src.addr_raw.v4 = bpf_ntohl(ip4h->saddr);
+		key.dst.addr_raw.v4 = bpf_ntohl(ip4h->daddr);
+		event.src.version = key.dst.version = 4;
 		sockets_key_for_md.family = SE_AF_INET;
 
 		// Check if packets follow TCP protocol and if we want to drop tcp packets 
@@ -212,18 +218,18 @@ int egress_tcp_drop(struct __sk_buff *skb){
 		{								
 			struct tcphdr *tcph = (struct tcphdr *)((__u8 *)ip4h + (ip4h->ihl * 4));
 			if ((void *)(tcph + 1) > data_end) return TC_OK;  								// Packet is too short, ignore
-			event->src.proto = key->dst.proto = IPPROTO_TCP;
-			event->src.port = bpf_ntohs(tcph->source);										// Extract source and destination ports from the TCP header			
-			key->dst.port = bpf_ntohs(tcph->dest);
+			event.src.proto = key.dst.proto = IPPROTO_TCP;
+			event.src.port = bpf_ntohs(tcph->source);										// Extract source and destination ports from the TCP header			
+			key.dst.port = bpf_ntohs(tcph->dest);
 			sockets_key_for_md.proto = IPPROTO_TCP;
 		} 
 		else if (filter_udp == true && ip4h->protocol == IPPROTO_UDP )
 		{										
 			struct udphdr *udph = (struct udphdr *)((__u8 *)ip4h + (ip4h->ihl * 4));
 			if ((void *)(udph + 1) > data_end) return TC_OK;  								// Packet is too short
-			event->src.port = bpf_ntohs(udph->source);										// Extract source and destination ports from the UDP header
-			key->dst.port = bpf_ntohs(udph->dest);
-			event->src.proto = key->dst.proto = IPPROTO_UDP;
+			event.src.port = bpf_ntohs(udph->source);										// Extract source and destination ports from the UDP header
+			key.dst.port = bpf_ntohs(udph->dest);
+			event.src.proto = key.dst.proto = IPPROTO_UDP;
 			sockets_key_for_md.proto = IPPROTO_UDP;
 		}
 		else 
@@ -240,28 +246,28 @@ int egress_tcp_drop(struct __sk_buff *skb){
 		{
 			return TC_OK;
 		}
-		event->src.version = key->dst.version = 6;
+		event.src.version = key.dst.version = 6;
 		sockets_key_for_md.family = SE_AF_INET6;
 		
 		// Check if packets follow TCP protocol
 		if (filter_tcp == true && ip6h->nexthdr == IPPROTO_TCP) 
 		{
-			read_ipv6_address(event, key, ip6h);
+			read_ipv6_address(&event, &key, ip6h);
 
 			struct tcphdr *tcph = (struct tcphdr *)(ip6h + 1);
-			if ((void *)(tcph + 1) > data_end)  return TC_OK;  // Packet is too short, ignore
-			event->src.proto = key->dst.proto = IPPROTO_TCP;
-			event->src.port = bpf_ntohs(tcph->source);
-			event->src.port = bpf_ntohs(tcph->dest);
+			if ((void *)(tcph + 1) > data_end)  return TC_OK; 							 // Packet is too short, ignore
+			event.src.proto = key.dst.proto = IPPROTO_TCP;
+			event.src.port = bpf_ntohs(tcph->source);
+			event.src.port = bpf_ntohs(tcph->dest);
 			sockets_key_for_md.proto = IPPROTO_TCP;
 		} 
 		else if (filter_udp == true && ip6h->nexthdr == IPPROTO_UDP)
 		{
 			struct udphdr *udph = (struct udphdr *)(ip6h + 1);
-			if ((void *)(udph + 1) > data_end)  return TC_OK;  // Packet is too short, ignore
-			event->src.port = bpf_ntohs(udph->source);
-			key->dst.port = bpf_ntohs(udph->dest);
-			event->src.proto = key->dst.proto = IPPROTO_UDP;
+			if ((void *)(udph + 1) > data_end)  return TC_OK;  							  // Packet is too short, ignore
+			event.src.port = bpf_ntohs(udph->source);
+			key.dst.port = bpf_ntohs(udph->dest);
+			event.src.proto = key.dst.proto = IPPROTO_UDP;
 			sockets_key_for_md.proto = IPPROTO_UDP;
 		}
 		else
@@ -274,19 +280,21 @@ int egress_tcp_drop(struct __sk_buff *skb){
 		return TC_OK;	// Letting them pass through the without further processing
 	}
 	
-	sockets_key_for_md.port = key->dst.port;
+	/* Data collection using the socket enricher, we use the key from the map
+	to collect information regarding pid, mntns_id, tid, ppid etc */
+	sockets_key_for_md.port = key.dst.port;
 	struct sockets_value *skb_val = bpf_map_lookup_elem(&gadget_sockets, &sockets_key_for_md);
 	if (skb_val != NULL) {
-		event->mntns_id = skb_val->mntns;
-		event->pid = skb_val->pid_tgid >> 32;
-		event->tid = (__u32)skb_val->pid_tgid;
-		event->ppid = skb_val->ppid;
-		__builtin_memcpy(&event->comm, skb_val->task,
-				sizeof(event->comm));
-		__builtin_memcpy(&event->pcomm, skb_val->ptask,
-				sizeof(event->pcomm));
-		event->uid = (__u32)skb_val->uid_gid;
-		event->gid = (__u32)(skb_val->uid_gid >> 32);
+		event.mntns_id = skb_val->mntns;
+		event.pid = skb_val->pid_tgid >> 32;
+		event.tid = (__u32)skb_val->pid_tgid;
+		event.ppid = skb_val->ppid;
+		__builtin_memcpy(&event.comm, skb_val->task,
+				sizeof(event.comm));
+		__builtin_memcpy(&event.pcomm, skb_val->ptask,
+				sizeof(event.pcomm));
+		event.uid = (__u32)skb_val->uid_gid;
+		event.gid = (__u32)(skb_val->uid_gid >> 32);
 	}
 
 
@@ -306,43 +314,44 @@ int egress_tcp_drop(struct __sk_buff *skb){
 	filter_ip.port = port;
 	filter_ip.proto = IPPROTO_TCP;
 	filter_ip.version = 4;
-	event->filter_ipv4 = filter_ip;
-	event->timestamp_raw = bpf_ktime_get_boot_ns();
+	event.filter_ipv4 = filter_ip;
+	event.timestamp_raw = bpf_ktime_get_boot_ns();
 
 	// Get a random 32-bit unsigned integer
     __u32 rand_num = bpf_get_prandom_u32();
-    // Set the threshold
+    // Set the threshold using the loss_percentage
     volatile __u64 threshold = (volatile __u64)((volatile __u64)loss_percentage * (__u64)0xFFFFFFFF)/100; // loss_percentage% of UINT32_MAX
 
-	event_map_val = bpf_map_lookup_elem(&events_map,key);
+	event_map_val = bpf_map_lookup_elem(&events_map,&key);
 
 
+	/* To cover different cases where the IP and port pair are given */
 	// If both IP and port are 0, then drop loss% of all packets
 	if(a == 0 && b == 0 && c == 0 && d == 0 && port == 0)
 	{
-		return drop_packet(rand_num,threshold, event_map_val,event, key);
+		return drop_packet(rand_num,threshold, event_map_val,&event, &key);
 	} 
 	// If the IP is non 0 and port is 0, then drop all packets to any port for that IP
 	else if ((a != 0 || b != 0 || c != 0 || d == 0) && port == 0) 
 	{
-		if(key->dst.addr_raw.v4 == filter_ip.addr_raw.v4)
+		if(key.dst.addr_raw.v4 == filter_ip.addr_raw.v4)
 		{
-			drop_packet(rand_num,threshold, event_map_val,event, key);
+			drop_packet(rand_num,threshold, event_map_val,&event, &key);
 		}
 	}
 	// If IP is zero and port is non zero, then drop all packets to the port
 	else if(a == 0 && b == 0 && c == 0 && d == 0 && port != 0){
 		
-		if(key->dst.port == filter_ip.port)
+		if(key.dst.port == filter_ip.port)
 		{
-			drop_packet(rand_num,threshold, event_map_val,event, key);
+			drop_packet(rand_num,threshold, event_map_val,&event, &key);
 		}
 	}
 	// If both are non zero
 	else
 	{
-		if(key->dst.addr_raw.v4 == filter_ip.addr_raw.v4 && key->dst.port == filter_ip.port){
-			drop_packet(rand_num,threshold, event_map_val,event, key);
+		if(key.dst.addr_raw.v4 == filter_ip.addr_raw.v4 && key.dst.port == filter_ip.port){
+			drop_packet(rand_num,threshold, event_map_val,&event, &key);
 		}
 	}
 	
