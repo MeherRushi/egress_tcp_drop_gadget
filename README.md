@@ -39,9 +39,15 @@ So temporarily I thought of taking IPv4 address and port using flags --a,--b,--c
 
 - extend the input to IPv6 as well
 
-- Can definetly decouple the IP address and Port Number while comparision.
-
 - Can look into the filtering based on container mount id as well
+
+- /* 
+# user space
+- Change the IP parameter for ipv4 and ipv6 - need to read code
+- then use kubeIPresolver to filter by name etc 
+	- looks like for the non image based gadgets
+ */
+
 
 
 ## Flags

@@ -1,5 +1,5 @@
 name: egress_tcp_drop
-description: Drop egress TCP packets based on destination address, port pair
+description: Drop egress/ingress TCP/UDP packets based on destination address, port pair
 homepageURL: http://egress_tcp_drop.com
 documentationURL: https://egress_tcp_drop.com/docs
 sourceURL: https://github.com/my-org/egress_tcp_drop/
@@ -12,85 +12,104 @@ datasources:
     fields:
       comm:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Process name
+          template: comm
       drop_cnt:
         annotations:
-          description: 'TODO: Fill field description'
+          description: The number of packets dropped per destination address, port pair
       dst:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Destination endpoint
+          template: l4endpoint
       filter_ipv4:
         annotations:
-          description: 'TODO: Fill field description'
+          description: The dst ipv4 address and port pair to filter packets
+          template: l4endpoint
       gid:
         annotations:
-          description: 'TODO: Fill field description'
+          columns.hidden: "true"
+          description: Group ID
+          template: uid
       mntns_id:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Mount namespace inode id
+          template: ns
       netns_id:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Network namespace inode id
+          template: ns
       pcomm:
         annotations:
-          description: 'TODO: Fill field description'
+          columns.hidden: "true"
+          template: pcomm
       pid:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Process ID
+          template: pid
       ppid:
         annotations:
-          description: 'TODO: Fill field description'
+          columns.hidden: "true"
+          description: Parent process ID
+          template: pid
       src:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Source endpoint
+          template: l4endpoint
       tid:
         annotations:
-          description: 'TODO: Fill field description'
+          columns.hidden: "true"
+          description: Thread ID
+          template: pid
       timestamp_raw:
         annotations:
-          description: 'TODO: Fill field description'
+          description: Timestamp at which the event was generated
+          template: timestamp
+          columns.hidden: "true"
       uid:
         annotations:
-          description: 'TODO: Fill field description'
+          columns.hidden: "true"
+          description: User ID
+          template: uid
+
 params:
   ebpf:
     a:
       key: a
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "0"
+      description: The first 8 bits of the filter IPv4 address in Integer Format (Eg:- 127)
     b:
       key: b
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "0"
+      description: The second 8 bits of the filter IPv4 address in Integer Format (Eg:- 0)
     c:
       key: c
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "0"
+      description: The third 8 bits of the filter IPv4 address in Integer Format (Eg:- 0)
     d:
       key: d
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "0"
+      description: The last 8 bits of the filter IPv4 address in Integer Format (Eg:- 1)
     egress:
       key: egress
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "true"
+      description: This is a boolean parameter to indicate whether the program is to be attached at the egress hookpoint or not
     filter_tcp:
       key: filter_tcp
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "true"
+      description: This is a boolean parameter to decide whether TCP packets should be filtered or not
     filter_udp:
       key: filter_udp
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "true"
+      description: This is a boolean parameter to decide whether UDP packets should be filtered or not
     ingress:
       key: ingress
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "false"
+      description: This is a boolean parameter to indicate whether the program is to be attached at the ingress hookpoint or not
     loss_percentage:
       key: loss_percentage
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "100"
+      description: This is the percentage of packets to be dropped (Eg:- 100)
     port:
       key: port
-      defaultValue: ""
-      description: 'TODO: Fill parameter description'
+      defaultValue: "0"
+      description: port number (Eg:- 443)
