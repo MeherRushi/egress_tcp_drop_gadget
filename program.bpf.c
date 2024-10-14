@@ -78,7 +78,7 @@ struct event {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, MAX_ENTRIES);
-	__type(key,struct events_map_key);	// The key is going to be <dst addr,port> pair
+	__type(key,struct events_map_key);	// The key is going to be <target addr,port> pair
 	__type(value,struct event);
 } events_map SEC(".maps");
 
@@ -169,7 +169,7 @@ static __always_inline int ingress_egress_manage_pkt_drop(bool ingress, bool egr
 	if(egress == true) 
 		return rand_pkt_drop_map_update(event, key,sockets_key_for_md);
 	if(ingress == true)
-		swap_src_dst(&event, &key);
+		swap_src_dst(event, key);
 		return rand_pkt_drop_map_update(event, key,sockets_key_for_md);
 	return TC_ACT_OK;
 }
@@ -182,7 +182,7 @@ static __always_inline void read_ipv6_address(struct event *event, struct events
 
 static __always_inline int packet_drop(struct __sk_buff *skb){
 		
-	struct events_map_key key;						/* This is the key for events_map -> being the dst addr,port pair */
+	struct events_map_key key;						/* This is the key for events_map -> being the target addr,port pair */
 	struct sockets_key sockets_key_for_md; 			/* This is for socket enrichement map */
 	struct event event ;							/* The sturct to store the information regarding the event */						
 
