@@ -26,6 +26,7 @@ vmlinux.h */
 
 
 #include <stdbool.h>
+#include <string.h>
 
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
@@ -43,6 +44,12 @@ vmlinux.h */
 #define MAX_ENTRIES 8192
 #define TASK_COMM_LEN 16
 
+typedef struct {
+    __u64 a;
+    __u64 b;
+} __u128;
+
+
 struct events_map_key{
 	struct gadget_l4endpoint_t dst;
 	/* another field to indicate source or destination */
@@ -51,7 +58,6 @@ struct events_map_key{
 struct event {
 	gadget_timestamp timestamp_raw;
 	struct gadget_l4endpoint_t src;
-	struct gadget_l4endpoint_t filter_ipv4;
     gadget_counter__u32 drop_cnt;
 	bool ingress;
 	bool egress;
@@ -79,11 +85,10 @@ struct {
 GADGET_MAPITER(events_map_iter,events_map);
 
 
+
 // we use the following variables as parameters
-const volatile __u8 a = 0;
-const volatile __u8 b = 0;
-const volatile __u8 c = 0;
-const volatile __u8 d = 0;
+volatile const __u32 ipaddr_v4_filter = 0;
+volatile const __u128 ipaddr_v6_filter =  {0,0}; 
 const volatile __u16 port = 0;
 const volatile __u32 loss_percentage = 100;
 const volatile bool filter_tcp = true;		/* This is a boolean flag to enable filtering of TCP packets */
@@ -91,10 +96,8 @@ const volatile bool filter_udp = true;		/* This is a boolean flag to enable filt
 const volatile bool ingress = false;		/* This is a boolean flag to enable filtering of ingress packets */
 const volatile bool egress = true;			/* This is a boolean flag to enable filtering of egress packets */
 
-GADGET_PARAM(a);
-GADGET_PARAM(b);
-GADGET_PARAM(c);
-GADGET_PARAM(d);
+GADGET_PARAM(ipaddr_v4_filter);
+GADGET_PARAM(ipaddr_v6_filter);
 GADGET_PARAM(port);
 GADGET_PARAM(loss_percentage);
 GADGET_PARAM(filter_tcp);
@@ -102,18 +105,14 @@ GADGET_PARAM(filter_udp);
 GADGET_PARAM(ingress);
 GADGET_PARAM(egress);
 
-/* 
-Let's take the ip to be in the 
-format of -a 127 -b 0 -c 0 -d 1 -port 443
-which translates to 127.0.0.1:443 
-*/
 
 /* This function drops packets based on independent (Bernoulli) probability model 
 where each packet is dropped with an independent probabilty for dropping packets */
 static int rand_pkt_drop_map_update(struct event *event, struct events_map_key *key,
 									struct sockets_key *sockets_key_for_md)
 {
-    __u32 rand_num = bpf_get_prandom_u32();									// Get a random 32-bit unsigned integer
+    bpf_printk("%d",event->drop_cnt);
+	__u32 rand_num = bpf_get_prandom_u32();									// Get a random 32-bit unsigned integer
     // Set the threshold using the loss_percentage
     volatile __u64 threshold = (volatile __u64)(
 								(volatile __u64)loss_percentage 
@@ -122,6 +121,8 @@ static int rand_pkt_drop_map_update(struct event *event, struct events_map_key *
 	
 	struct event *event_map_val  = bpf_map_lookup_elem(&events_map,key);   /* The events which are stored in the events_map */
 	
+	if(!event) return TC_ACT_OK;
+
 	if (rand_num <= (u32)threshold)											// Run the code only if the random number is less than the threshold
 	{
 		if(!event_map_val){
@@ -162,19 +163,28 @@ static __always_inline void swap_src_dst(struct event *event, struct events_map_
 	key->dst = temp;
 }
 
+static __always_inline int ingress_egress_manage_pkt_drop(bool ingress, bool egress,
+													struct event *event, struct events_map_key *key,
+													struct sockets_key *sockets_key_for_md){
+	if(egress == true) 
+		return rand_pkt_drop_map_update(event, key,sockets_key_for_md);
+	if(ingress == true)
+		swap_src_dst(&event, &key);
+		return rand_pkt_drop_map_update(event, key,sockets_key_for_md);
+	return TC_ACT_OK;
+}
+
 static __always_inline void read_ipv6_address(struct event *event, struct events_map_key *key, struct ipv6hdr *ip6h ){
 	bpf_probe_read_kernel(event->src.addr_raw.v6, sizeof(event->src.addr_raw.v6), ip6h->saddr.in6_u.u6_addr8);
 	bpf_probe_read_kernel(key->dst.addr_raw.v6, sizeof(key->dst.addr_raw.v6), ip6h->daddr.in6_u.u6_addr8);
 }
 
+
 static __always_inline int packet_drop(struct __sk_buff *skb){
 		
 	struct events_map_key key;						/* This is the key for events_map -> being the dst addr,port pair */
 	struct sockets_key sockets_key_for_md; 			/* This is for socket enrichement map */
-
-	struct gadget_l4endpoint_t filter_ip;			/* filter ip - ideally should be a parameter from userspace */
-
-	struct event event;								/* The sturct to store the information regarding the event */						
+	struct event event ;							/* The sturct to store the information regarding the event */						
 
 	event.egress = egress;
 	event.ingress = ingress;
@@ -287,91 +297,81 @@ static __always_inline int packet_drop(struct __sk_buff *skb){
 	{
 		return TC_ACT_OK;	// Letting them pass through the without further processing
 	}
-	
 
-	filter_ip.addr_raw.v4 = (a << 24) | (b << 16) | (c << 8) | d;
-	filter_ip.port = port;
-	if(filter_tcp == true)
-		filter_ip.proto = IPPROTO_TCP;
-	else
-		filter_ip.proto = IPPROTO_UDP;
-	filter_ip.version = 4;
-	event.filter_ipv4 = filter_ip;
+	/* 
+		Possible filtering cases:
+
+		IPv4   IPv6   Port
+		y		y		y
+		y		n		y
+		y		y		n
+		y		n		n
+		n		y		y
+		.....
+	 */
 	event.timestamp_raw = bpf_ktime_get_boot_ns();
 
+	__u8 v4_set = 0;
+	__u8 v6_set = 0;
+	__u8 port_set = 0;
 
-	/* To cover different cases where the IP and port pair are given */
-	// If both IP and port are 0, then drop loss% of all packets
-	if(a == 0 && b == 0 && c == 0 && d == 0 && port == 0)
+	if (ipaddr_v4_filter != 0) v4_set = 1;
+	if (ipaddr_v6_filter.a != 0 || ipaddr_v6_filter.b != 0) v6_set = 1;
+	if (port != 0) port_set = 1;
+
+	__u8 case_id = (__u8)((v4_set << 2) | (v6_set << 1) | port_set);
+
+	bpf_printk("v4_set : %u", v4_set);
+	bpf_printk("v6_set : %u", v6_set);
+	bpf_printk("port_set : %u", port_set);
+	bpf_printk("case_id : %u", case_id);
+
+	switch(case_id) 
 	{
-		return rand_pkt_drop_map_update(&event, &key, &sockets_key_for_md);
-	} 
-	// If the IP is non 0 and port is 0, then drop all packets to any port for that IP
-	else if ((a != 0 || b != 0 || c != 0 || d == 0) && port == 0) 
-	{
-		if(ingress == true && egress == true) 				// Then we drop in case it matches either destination or source
-		{
-			if(key.dst.addr_raw.v4 == filter_ip.addr_raw.v4 || event.src.addr_raw.v4 == filter_ip.addr_raw.v4)
-			{
-				rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
-				swap_src_dst(&event, &key);
-				return rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
+        case 7: // IPv4, IPv6, Port (0b111)
+			if((key.dst.version == 4 && memcmp(	&ipaddr_v4_filter, &key.dst.addr_raw, sizeof(ipaddr_v4_filter)) == 0
+			 || key.dst.version == 6 && memcmp(&ipaddr_v6_filter, &key.dst.addr_raw, sizeof(ipaddr_v6_filter)) == 0)
+			 &&  port == key.dst.port ){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
 			}
-		}	
-		else 													// Both ingress and egress being false will not even invoke this function so this else case deals with only either one of them being true
-		{
-			if(ingress == true)
-				swap_src_dst(&event, &key);
-			if (key.dst.addr_raw.v4 == filter_ip.addr_raw.v4)
-			{
-				return rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
+            break;
+        case 6: // IPv4, IPv6, No Port (0b110)
+			if(key.dst.version == 4 && memcmp(&ipaddr_v4_filter, &key.dst.addr_raw, sizeof(ipaddr_v4_filter)) == 0
+			 || key.dst.version == 6 && memcmp(&ipaddr_v6_filter, &key.dst.addr_raw, sizeof(ipaddr_v6_filter)) == 0){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
 			}
-		}
-	}
-	// If IP is zero and port is non zero, then drop all packets to the port
-	else if(a == 0 && b == 0 && c == 0 && d == 0 && port != 0)
-	{
-		if(ingress == true && egress == true) 				// Then we drop in case it matches either destination or source
-		{
-			if(key.dst.port == filter_ip.port|| event.src.port == filter_ip.port)
-			{
-				rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
-				swap_src_dst(&event, &key);
-				return rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
+            break;
+        case 5: // IPv4, No IPv6, Port (0b101)
+			if(key.dst.version == 4 && memcmp(&ipaddr_v4_filter, &key.dst.addr_raw, sizeof(ipaddr_v4_filter)) == 0 && port == key.dst.port){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
 			}
-		}
-		else 													// Both ingress and egress being false will not even invoke this function so this else case deals with only either one of them being true
-		{
-			if(ingress == true)
-				swap_src_dst(&event, &key);
-			if(key.dst.port == filter_ip.port)
-			{
-				return rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
+            break;
+        case 4: // IPv4, No IPv6, No Port (0b100)
+			if(key.dst.version == 4 && memcmp(&ipaddr_v4_filter, &key.dst.addr_raw, sizeof(ipaddr_v4_filter)) == 0){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
 			}
-		}
-	}
-	// If both are non zero
-	else
-	{
-		if(ingress == true && egress == true) 				// Then we drop in case it matches either destination or source
-		{
-			if(key.dst.addr_raw.v4 == filter_ip.addr_raw.v4 && key.dst.port == filter_ip.port || event.src.addr_raw.v4 == filter_ip.addr_raw.v4 && event.src.port == filter_ip.port)
-			{
-				rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
-				swap_src_dst(&event, &key);
-				return rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
+            break;
+        case 3: // No IPv4, IPv6, Port (0b011)
+			if(key.dst.version == 6 && memcmp(&ipaddr_v6_filter, &key.dst.addr_raw, sizeof(ipaddr_v6_filter)) == 0 && port == key.dst.port){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
 			}
-		}
-		else 												// Both ingress and egress being false will not even invoke this function so this else case deals with only either one of them being true
-		{
-			if(ingress == true)
-				swap_src_dst(&event, &key);
-			if(key.dst.addr_raw.v4 == filter_ip.addr_raw.v4 && key.dst.port == filter_ip.port)
-			{
-				return rand_pkt_drop_map_update(&event, &key,&sockets_key_for_md);
+            break;
+        case 2: // No IPv4, IPv6, No Port (ob010)
+			if(key.dst.version == 6 && memcmp(&ipaddr_v6_filter, &key.dst.addr_raw, sizeof(ipaddr_v6_filter)) == 0){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
 			}
-		}
-	}
+            break;
+        case 1: // No IPv4, No IPv6, Port (0b001)
+			if(port == key.dst.port){
+				return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
+			}
+            break;
+        case 0: // No IPv4, No IPv6, No Port (0b000)
+			return ingress_egress_manage_pkt_drop(ingress,egress,&event, &key,&sockets_key_for_md);
+            break;
+		default:
+			bpf_printk("default case : something wrong with the logic");
+    }
 	
 	return TC_ACT_OK;
 }
