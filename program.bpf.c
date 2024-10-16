@@ -26,6 +26,7 @@ vmlinux.h */
 
 
 #include <stdbool.h>
+#include <string.h>
 
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
@@ -47,7 +48,6 @@ typedef struct {
     __u64 a;
     __u64 b;
 } __u128;
-
 
 struct events_map_key{
 	struct gadget_l4endpoint_t dst;
@@ -214,10 +214,10 @@ static __always_inline int packet_drop(struct __sk_buff *skb){
 	event.netns_id = skb->cb[0]; 					// cb[0] initialized by dispatcher.bpf.c to get the netns
 	sockets_key_for_md.netns = event.netns_id;		
 
-    void *data = (void *)(long)skb->data;			
-    void *data_end = (void *)(long)skb->data_end;
+  void *data = (void *)(long)skb->data;			
+  void *data_end = (void *)(long)skb->data_end;
 
-    struct ethhdr *eth = data;
+  struct ethhdr *eth = data;
 	struct iphdr *ip4h ;
 	struct ipv6hdr *ip6h ;
 
@@ -343,7 +343,6 @@ static __always_inline int packet_drop(struct __sk_buff *skb){
 	if (port != 0) port_set = 1;
 
 	__u8 case_id = (__u8)((v4_set << 2) | (v6_set << 1) | port_set);
-
 
 	bpf_printk("yus or no : %u", compare_v6_ipaddr_v6(key.dst.addr_raw.v6));
 

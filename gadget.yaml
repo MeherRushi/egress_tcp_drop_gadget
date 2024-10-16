@@ -99,7 +99,7 @@ params:
         to be attached at the ingress hookpoint or not
     ipaddr_v4_filter:
       key: ipaddr_v4_filter
-      defaultValue: "0"
+      defaultValue: "0.0.0.0"
       description: This is a string parameter of IPv4 that gets converted to a uint32
         in the kernel space
     ipaddr_v6_filter:
