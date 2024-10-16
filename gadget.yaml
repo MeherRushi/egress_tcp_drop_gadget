@@ -99,12 +99,14 @@ params:
         to be attached at the ingress hookpoint or not
     ipaddr_v4_filter:
       key: ipaddr_v4_filter
-      defaultValue: "0"
-      description: This is a string parameter of IPv4 that gets converted to a uint32 in the kernel space
+      defaultValue: "0.0.0.0"
+      description: This is a string parameter of IPv4 that gets converted to a uint32
+        in the kernel space
     ipaddr_v6_filter:
       key: ipaddr_v6_filter
-      defaultValue: "::"
-      description: This is a string parameter of IPv6 that gets converted to a struct uint128 of 2 u64 members in the kernel space
+      defaultValue: '::'
+      description: This is a string parameter of IPv6 that gets converted to a struct
+        uint128 of 2 u64 members in the kernel space
     loss_percentage:
       key: loss_percentage
       defaultValue: "100"
